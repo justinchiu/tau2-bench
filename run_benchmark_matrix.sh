@@ -16,16 +16,17 @@ USER_MODELS=(
     "anthropic_sonnet:claude-sonnet-4-5-20250929"
     # Bedrock
     "bedrock_sonnet:bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0"
-    "bedrock_deepseek:bedrock/us.deepseek.v3-v1:0"
-    "bedrock_glm:bedrock/converse/us.zai.glm-4.7"
-    "bedrock_k2:bedrock/converse/us.moonshotai.kimi-k2.5"
+    "bedrock_deepseek:bedrock/converse/deepseek.v3.2"
+    "bedrock_glm:bedrock/converse/zai.glm-4.7"
+    "bedrock_k2:bedrock/converse/moonshotai.kimi-k2.5"
     # Native APIs
     "native_deepseek:deepseek/deepseek-chat"
     "native_k2:moonshot/kimi-k2.5"
 )
 
 
-DOMAINS=("airline" "retail" "telecom")
+#DOMAINS=("airline" "retail" "telecom")
+DOMAINS=("retail")
 
 NUM_TRIALS=${NUM_TRIALS:-2}
 NUM_TASKS=${NUM_TASKS:-}  # Empty = all tasks (official). Set to number for quick test.
@@ -45,6 +46,7 @@ for user_entry in "${USER_MODELS[@]}"; do
 
         cmd="$VENV_BIN/tau2 run \
             --domain $domain \
+            --task-split-name test \
             --agent-llm $AGENT_MODEL \
             --user-llm $user_model \
             --num-trials $NUM_TRIALS \
@@ -53,6 +55,11 @@ for user_entry in "${USER_MODELS[@]}"; do
         # Add --num-tasks only if NUM_TASKS is set
         if [ -n "$NUM_TASKS" ]; then
             cmd="$cmd --num-tasks $NUM_TASKS"
+        fi
+
+        # Moonshot K2.5 only allows temperature=1
+        if [[ "$user_name" == "native_k2" ]]; then
+            cmd="$cmd --user-llm-args '{\"temperature\": 1.0}'"
         fi
 
         echo "Command: $cmd"
