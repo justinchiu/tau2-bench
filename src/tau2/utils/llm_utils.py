@@ -134,6 +134,16 @@ def to_tau2_messages(
     return tau2_messages
 
 
+def _sanitize_tool_name(name: str) -> str:
+    """Sanitize a tool name to match Bedrock's [a-zA-Z0-9_-]+ constraint.
+
+    LLMs sometimes hallucinate tool names with invalid characters (e.g. $DEVICE_ACTION).
+    Bedrock rejects these in conversation history, so we strip invalid chars.
+    """
+    sanitized = re.sub(r"[^a-zA-Z0-9_-]", "", name)
+    return sanitized or "unknown_tool"
+
+
 def to_litellm_messages(messages: list[Message]) -> list[dict]:
     """
     Convert a list of Tau2 messages to a list of litellm messages.
@@ -148,9 +158,9 @@ def to_litellm_messages(messages: list[Message]) -> list[dict]:
                 tool_calls = [
                     {
                         "id": tc.id,
-                        "name": tc.name,
+                        "name": _sanitize_tool_name(tc.name),
                         "function": {
-                            "name": tc.name,
+                            "name": _sanitize_tool_name(tc.name),
                             "arguments": json.dumps(tc.arguments),
                         },
                         "type": "function",
