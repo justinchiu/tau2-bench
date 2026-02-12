@@ -26,7 +26,8 @@ USER_MODELS=(
 
 
 #DOMAINS=("airline" "retail" "telecom")
-DOMAINS=("retail")
+#DOMAINS=("retail")
+DOMAINS=("telecom")
 
 NUM_TRIALS=${NUM_TRIALS:-2}
 NUM_TASKS=${NUM_TASKS:-}  # Empty = all tasks (official). Set to number for quick test.
@@ -43,6 +44,31 @@ for user_entry in "${USER_MODELS[@]}"; do
         echo "  User:  $user_name ($user_model)"
         echo "  Domain: $domain"
         echo "=========================================="
+
+        # Skip if results file already has all simulations completed
+        results_file="$SCRIPT_DIR/data/simulations/${run_name}.json"
+        if [ -f "$results_file" ]; then
+            completed=$(python3 -c "
+import json, sys
+d = json.load(open('$results_file'))
+tasks = len(d.get('tasks', []))
+sims = len(d.get('simulations', []))
+expected = tasks * $NUM_TRIALS
+print(f'{sims}/{expected}')
+if sims >= expected and expected > 0:
+    sys.exit(0)
+else:
+    sys.exit(1)
+" 2>/dev/null)
+            if [ $? -eq 0 ]; then
+                echo "SKIPPING: $run_name already complete ($completed simulations)"
+                echo ""
+                continue
+            else
+                echo "Incomplete run found ($completed simulations), removing and rerunning..."
+                rm "$results_file"
+            fi
+        fi
 
         cmd="$VENV_BIN/tau2 run \
             --domain $domain \
