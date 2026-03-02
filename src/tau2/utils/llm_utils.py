@@ -214,6 +214,10 @@ def generate(
             messages=litellm_messages,
             tools=tools,
             tool_choice=tool_choice,
+            cache_control_injection_points=[
+                {"location": "message", "role": "system"},
+                {"location": "message", "index": -1},
+            ],
             **kwargs,
         )
     except Exception as e:
