@@ -173,7 +173,10 @@ def to_litellm_messages(messages: list[Message]) -> list[dict]:
                 }
             )
         elif isinstance(message, SystemMessage):
-            litellm_messages.append({"role": "system", "content": message.content})
+            litellm_messages.append({
+                "role": "system",
+                "content": [{"type": "text", "text": message.content, "cache_control": {"type": "ephemeral"}}],
+            })
     return litellm_messages
 
 
