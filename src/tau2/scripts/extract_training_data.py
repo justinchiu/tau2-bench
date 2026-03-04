@@ -318,8 +318,9 @@ def main():
                 f"{len(agent_tools)} agent, {len(user_tools)} user"
             )
         except Exception as e:
-            logger.warning(f"Could not load tools for domain {domain_name}: {e}")
-            agent_tools, user_tools = None, None
+            raise RuntimeError(
+                f"Failed to load tools for domain '{domain_name}' while processing '{f}'"
+            ) from e
 
         all_agent_convos.extend(
             extract_agent_conversations(results, agent_tools=agent_tools)
