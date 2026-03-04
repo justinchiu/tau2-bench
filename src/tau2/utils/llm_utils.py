@@ -183,7 +183,10 @@ def to_litellm_messages(messages: list[Message]) -> list[dict]:
                 }
             )
         elif isinstance(message, SystemMessage):
-            litellm_messages.append({"role": "system", "content": message.content})
+            litellm_messages.append({
+                "role": "system",
+                "content": [{"type": "text", "text": message.content, "cache_control": {"type": "ephemeral"}}],
+            })
     return litellm_messages
 
 
@@ -221,6 +224,10 @@ def generate(
             messages=litellm_messages,
             tools=tools,
             tool_choice=tool_choice,
+            cache_control_injection_points=[
+                {"location": "message", "role": "system"},
+                {"location": "message", "index": -1},
+            ],
             **kwargs,
         )
     except Exception as e:

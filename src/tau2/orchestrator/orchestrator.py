@@ -481,10 +481,24 @@ class Orchestrator:
         elif (
             self.from_role == Role.USER or self.from_role == Role.ENV
         ) and self.to_role == Role.AGENT:
-            agent_msg, self.agent_state = self.agent.generate_next_message(
-                self.message, self.agent_state
-            )
-            agent_msg.validate()
+            for _retry in range(3):
+                agent_msg, self.agent_state = self.agent.generate_next_message(
+                    self.message, self.agent_state
+                )
+                try:
+                    agent_msg.validate()
+                    break
+                except ValueError:
+                    logger.warning(
+                        f"Agent returned empty response (no content or tool calls). Retry {_retry + 1}/3."
+                    )
+            else:
+                logger.warning(
+                    "Agent returned empty response after 3 retries. Treating as agent stop."
+                )
+                agent_msg.content = ""
+                self.done = True
+                self.termination_reason = TerminationReason.AGENT_STOP
             if self.agent.is_stop(agent_msg):
                 self.done = True
                 self.termination_reason = TerminationReason.AGENT_STOP
