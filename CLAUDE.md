@@ -76,8 +76,37 @@ aws s3 sync data/simulations/ s3://percepta-research/tau2-trajectories/raw_resul
 aws s3 sync training_data/ s3://percepta-research/tau2-trajectories/training_data/
 ```
 
+## Test Evaluations
+
+### opus-4.6 + gpt-4.1 user (test split, 2 trials)
+- Files: `opus46-gpt41user_{airline,retail,telecom}_test.json`
+- Results:
+  - airline: avg=0.700, pass^1=0.700, pass^2=0.650
+  - retail: avg=0.750, pass^1=0.750, pass^2=0.700
+  - telecom: avg=0.613, pass^1=0.613, pass^2=0.575
+
+### opus-4.6 + opus-4.6 user (test split, 2 trials)
+- Files: `opus46-opus46user_{airline,retail,telecom}_test.json`
+- Results:
+  - airline: avg=0.700, pass^1=0.700, pass^2=0.650
+  - retail: avg=0.900, pass^1=0.900, pass^2=0.900
+  - telecom: avg=0.825, pass^1=0.825, pass^2=0.750
+
+### Comparison table (avg reward / pass^1)
+
+| Agent + User | airline | retail | telecom |
+|---|---|---|---|
+| opus-4.6 + gpt-4.1 | 0.70/0.70 | 0.75/0.75 | 0.61/0.61 |
+| opus-4.6 + opus-4.6 | 0.70/0.70 | 0.90/0.90 | 0.83/0.83 |
+| qwen3.5-122b + gpt-4.1 | 0.72/0.80 | 0.75/0.90 | 1.00/1.00 |
+
+Note: Opus telecom failures are heavily concentrated on roaming-related actions (25/31 failures involve toggle_roaming or enable_roaming). Qwen 3.5-122b achieves 100% on telecom - all 40 tasks across both trials pass.
+
 ## Scripts
 - `scripts/run_distillation_train.sh` — distillation run script (configurable via `AGENT_LLM`, `USER_LLM`, `AGENT_TEMP`, `SAVE_PREFIX` env vars)
 - `scripts/extract_distillation_data.py` — extracts training data from specific distillation runs
+- `scripts/run_opus46_gpt41user.sh` — eval: opus-4.6 agent + gpt-4.1 user, test split, 2 trials
+- `scripts/run_opus46_opus46user.sh` — eval: opus-4.6 agent + opus-4.6 user, test split, 2 trials
+- `scripts/run_qwen122b_gpt41user.sh` — eval: qwen3.5-122b agent + gpt-4.1 user, test split, 2 trials
 - `src/tau2/scripts/extract_training_data.py` — general-purpose extraction from any results
   - Usage: `uv run python -m tau2.scripts.extract_training_data --input data/simulations/ --output-dir training_data/`
