@@ -1,6 +1,6 @@
 # Qwen3.5 tau2-bench Evaluation Results
 
-Evaluation of Qwen3.5-397B-A17B and Qwen3.5-27B on the tau2-bench test split across all 3 domains (airline, retail, telecom). All results use Pass^k from the tau2 paper: C(c,k)/C(n,k).
+Evaluation of Qwen3.5-397B-A17B, Qwen3.5-27B, and Qwen3.5-35B-A3B on the tau2-bench test split across all 3 domains (airline, retail, telecom). All results use Pass^k from the tau2 paper: C(c,k)/C(n,k).
 
 ## Setup
 
@@ -29,11 +29,11 @@ Evaluation of Qwen3.5-397B-A17B and Qwen3.5-27B on the tau2-bench test split acr
 
 ### With gpt-4.1 user simulator (temp0.6)
 
-| Domain | 27B self-play | 27B + gpt-4.1 user | 397B self-play | 397B + gpt-4.1 user | Sonnet 4.5 (leaderboard) |
-|--------|--------------|---------------------|---------------|---------------------|--------------------------|
-| Airline | 65.0% | **72.5%** | 67.5% | **72.5%** | 70% |
-| Retail | 56.2% | **85.0%** | 65.0% | **85.0%** | 86% |
-| Telecom | 97.5% | **100.0%** | 96.3% | **100.0%** | 98% |
+| Domain | 35B-A3B + gpt-4.1 | 27B + gpt-4.1 | 397B + gpt-4.1 | Sonnet 4.5 (leaderboard) |
+|--------|---------------------|---------------|----------------|--------------------------|
+| Airline | 42.5% | **72.5%** | **72.5%** | 70% |
+| Retail | 76.2% | **85.0%** | **85.0%** | 86% |
+| Telecom | 95.0% | **100.0%** | **100.0%** | 98% |
 
 ### Leaderboard reference (Pass^1, base split, gpt-4.1 user sim)
 
@@ -57,19 +57,20 @@ Note: Leaderboard entries use the **base** split (all tasks), not the test split
 
 ## Results (Pass^2) — gpt-4.1 user simulator
 
-| Domain | 27B + gpt-4.1 user | 397B + gpt-4.1 user | Sonnet 4.5 |
-|--------|---------------------|---------------------|------------|
-| Airline | 65.0% | 70.0% | — |
-| Retail | 75.0% | 72.5% | — |
-| Telecom | 100.0% | 100.0% | — |
+| Domain | 35B-A3B + gpt-4.1 | 27B + gpt-4.1 | 397B + gpt-4.1 | Sonnet 4.5 |
+|--------|---------------------|---------------|----------------|------------|
+| Airline | 35.0% | 65.0% | 70.0% | — |
+| Retail | 60.0% | 75.0% | 72.5% | — |
+| Telecom | 92.5% | 100.0% | 100.0% | — |
 
 ## Key Findings
 
-1. **Both Qwen3.5 models beat Sonnet 4.5** on airline (72.5% vs 70%) and telecom (100% vs 98%) with gpt-4.1 user sim, and nearly match on retail (85% vs 86%).
+1. **Qwen3.5-27B and 397B beat Sonnet 4.5** on airline (72.5% vs 70%) and telecom (100% vs 98%) with gpt-4.1 user sim, and nearly match on retail (85% vs 86%).
 2. **27B matches 397B exactly** with gpt-4.1 user sim (72.5%/85.0%/100.0% for both), showing agent capability is not the differentiator at this scale — the user simulator quality is.
-3. **Self-play user sim is the bottleneck, not agent capability.** Retail jumped from 56-65% to 85% simply by switching from Qwen3.5 self-play to gpt-4.1 user sim. Root cause: Qwen3.5 as user simulator sends `###STOP###` before the agent completes final mutating tool calls (`exchange_delivered_order_items`, `return_delivered_order_items`, `modify_pending_order_items`).
-4. **Temperature 0.6 consistently helps** across both model sizes and all domains.
-5. **Empty responses**: The model occasionally returns empty responses (no content or tool calls). Patched orchestrator to retry up to 3 times. Some runs have fewer than expected sims due to this (e.g., 27B default telecom: 63/80).
+3. **35B-A3B (3B active) shows a clear drop**, particularly on airline (42.5% vs 72.5%). With only 3B active parameters it struggles on complex multi-step tasks, though telecom (95%) remains strong.
+4. **Self-play user sim is the bottleneck, not agent capability.** Retail jumped from 56-65% to 85% simply by switching from Qwen3.5 self-play to gpt-4.1 user sim. Root cause: Qwen3.5 as user simulator sends `###STOP###` before the agent completes final mutating tool calls (`exchange_delivered_order_items`, `return_delivered_order_items`, `modify_pending_order_items`).
+5. **Temperature 0.6 consistently helps** across both model sizes and all domains.
+6. **Empty responses**: The model occasionally returns empty responses (no content or tool calls). Patched orchestrator to retry up to 3 times. Some runs have fewer than expected sims due to this (e.g., 27B default telecom: 63/80).
 
 ## Run Scripts
 
@@ -78,6 +79,8 @@ Note: Leaderboard entries use the **base** split (all tasks), not the test split
 | `scripts/run_qwen397b_test.sh` | 397B self-play sweep (temp0.6, all 3 domains) |
 | `scripts/run_qwen397b_gpt41user.sh` | 397B agent + gpt-4.1 user sim (temp0.6, all 3 domains) |
 | `scripts/run_qwen27b_gpt41user.sh` | 27B agent + gpt-4.1 user sim (temp0.6, all 3 domains) |
+| `scripts/run_qwen35b_test.sh` | 35B-A3B self-play sweep (temp0.6, all 3 domains) |
+| `scripts/run_qwen35b_gpt41user.sh` | 35B-A3B agent + gpt-4.1 user sim (temp0.6, all 3 domains) |
 
 ## Trajectory Files
 
