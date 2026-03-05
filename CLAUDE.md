@@ -92,10 +92,26 @@ aws s3 sync training_data/ s3://percepta-research/tau2-trajectories/training_dat
   - retail: avg=0.900, pass^1=0.900, pass^2=0.900
   - telecom: avg=0.825, pass^1=0.825, pass^2=0.750
 
+### sonnet-4.6 + gpt-4.1 user (test split, 2 trials)
+- Files: `sonnet46-gpt41user_{airline,retail,telecom}_test.json`
+- Results:
+  - airline: avg=0.750, pass^1=0.750, pass^2=0.750
+  - retail: avg=0.850, pass^1=0.850, pass^2=0.775
+  - telecom: avg=0.600, pass^1=0.600, pass^2=0.525
+
+### sonnet-4.6 + opus-4.6 user (test split, 2 trials)
+- Files: `sonnet46-opus46user_{airline,retail,telecom}_test.json`
+- Results:
+  - airline: avg=0.675, pass^1=0.675, pass^2=0.650
+  - retail: avg=0.838, pass^1=0.838, pass^2=0.825
+  - telecom: avg=0.875, pass^1=0.875, pass^2=0.775
+
 ### Comparison table (avg reward / pass^1)
 
 | Agent + User | airline | retail | telecom |
 |---|---|---|---|
+| sonnet-4.6 + gpt-4.1 | 0.75/0.75 | 0.85/0.85 | 0.60/0.60 |
+| sonnet-4.6 + opus-4.6 | 0.68/0.68 | 0.84/0.84 | 0.88/0.88 |
 | opus-4.6 + gpt-4.1 | 0.70/0.70 | 0.75/0.75 | 0.61/0.61 |
 | opus-4.6 + opus-4.6 | 0.70/0.70 | 0.90/0.90 | 0.83/0.83 |
 | qwen3.5-122b + gpt-4.1 | 0.72/0.80 | 0.75/0.90 | 1.00/1.00 |
@@ -105,6 +121,8 @@ Note: Opus telecom failures are heavily concentrated on roaming-related actions 
 ## Scripts
 - `scripts/run_distillation_train.sh` — distillation run script (configurable via `AGENT_LLM`, `USER_LLM`, `AGENT_TEMP`, `SAVE_PREFIX` env vars)
 - `scripts/extract_distillation_data.py` — extracts training data from specific distillation runs
+- `scripts/run_sonnet46_gpt41user.sh` — eval: sonnet-4.6 agent + gpt-4.1 user, test split, 2 trials
+- `scripts/run_sonnet46_opus46user.sh` — eval: sonnet-4.6 agent + opus-4.6 user, test split, 2 trials
 - `scripts/run_opus46_gpt41user.sh` — eval: opus-4.6 agent + gpt-4.1 user, test split, 2 trials
 - `scripts/run_opus46_opus46user.sh` — eval: opus-4.6 agent + opus-4.6 user, test split, 2 trials
 - `scripts/run_qwen122b_gpt41user.sh` — eval: qwen3.5-122b agent + gpt-4.1 user, test split, 2 trials
