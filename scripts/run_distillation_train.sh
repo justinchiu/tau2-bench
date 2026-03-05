@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 
-# Distillation run: agent=sonnet-4.6, user=gpt-4.1, train split, 4 trials
-AGENT_LLM="claude-sonnet-4-6"
-USER_LLM="gpt-4.1"
+# Distillation run: configurable agent/user LLM, train split, 4 trials
+AGENT_LLM="${AGENT_LLM:-claude-sonnet-4-6}"
+USER_LLM="${USER_LLM:-gpt-4.1}"
 AGENT_TEMP="${AGENT_TEMP:-1.0}"
-SAVE_PREFIX="distill_sonnet46_temp${AGENT_TEMP}_gpt41"
+SAVE_PREFIX="${SAVE_PREFIX:-distill_sonnet46_temp${AGENT_TEMP}_gpt41}"
 
 START_TIME=$(date +%s)
 
