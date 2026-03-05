@@ -218,21 +218,34 @@ def generate(
     tools = [tool.openai_schema for tool in tools] if tools else None
     if tools and tool_choice is None:
         tool_choice = "auto"
-    try:
-        response = completion(
-            model=model,
-            messages=litellm_messages,
-            tools=tools,
-            tool_choice=tool_choice,
-            cache_control_injection_points=[
-                {"location": "message", "role": "system"},
-                {"location": "message", "index": -1},
-            ],
-            **kwargs,
-        )
-    except Exception as e:
-        logger.error(e)
-        raise e
+
+    max_retries = DEFAULT_MAX_RETRIES
+    for attempt in range(max_retries + 1):
+        try:
+            response = completion(
+                model=model,
+                messages=litellm_messages,
+                tools=tools,
+                tool_choice=tool_choice,
+                cache_control_injection_points=[
+                    {"location": "message", "role": "system"},
+                    {"location": "message", "index": -1},
+                ],
+                **kwargs,
+            )
+            break
+        except litellm.exceptions.InternalServerError as e:
+            if attempt < max_retries:
+                import time
+                wait = 2 ** attempt
+                logger.warning(f"InternalServerError (attempt {attempt + 1}/{max_retries + 1}), retrying in {wait}s: {e}")
+                time.sleep(wait)
+            else:
+                logger.error(f"InternalServerError after {max_retries + 1} attempts: {e}")
+                raise e
+        except Exception as e:
+            logger.error(e)
+            raise e
     cost = get_response_cost(response)
     usage = get_response_usage(response)
     response = response.choices[0]
