@@ -1,10 +1,11 @@
 """
 Extract distillation training data for specific run configurations.
 
-Produces three datasets:
+Produces four datasets:
 1. sonnet46-gpt41: temp=0 (1 trial) + temp=1 (4 trials) = 5 per task
 2. sonnet46-opus46: temp=1 (4 trials) = 4 per task
 3. combined: both of the above
+4. sonnet46_gpt41_t1t1: agent temp=1 + user temp=1 (8 trials) = 8 per task
 """
 
 import json
@@ -82,7 +83,7 @@ def main():
     print_stats(opus_agent, "sonnet46-opus46 Agent")
     print_stats(opus_user, "sonnet46-opus46 User")
 
-    # 3. Combined
+    # 3. Combined (Runs 1-3)
     combined_agent = gpt41_agent + opus_agent
     combined_user = gpt41_user + opus_user
     out = OUT_DIR / "combined"
@@ -90,6 +91,22 @@ def main():
     write_jsonl(combined_user, out / "user.jsonl")
     print_stats(combined_agent, "Combined Agent")
     print_stats(combined_user, "Combined User")
+
+    # 4. sonnet46_gpt41_t1t1: agent temp=1 + user temp=1 (8 trials)
+    t1t1_agent = []
+    t1t1_user = []
+    for domain in DOMAINS:
+        a, u = load_and_extract(
+            SIM_DIR / f"distill_sonnet46_t1_gpt41_t1_{domain}_train.json",
+        )
+        t1t1_agent.extend(a)
+        t1t1_user.extend(u)
+
+    out = OUT_DIR / "sonnet46_gpt41_t1t1"
+    write_jsonl(t1t1_agent, out / "agent.jsonl")
+    write_jsonl(t1t1_user, out / "user.jsonl")
+    print_stats(t1t1_agent, "sonnet46-gpt41-t1t1 Agent")
+    print_stats(t1t1_user, "sonnet46-gpt41-t1t1 User")
 
 
 if __name__ == "__main__":

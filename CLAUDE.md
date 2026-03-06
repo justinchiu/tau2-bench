@@ -35,6 +35,16 @@ All results saved in `data/simulations/`.
   - retail: 74 tasks, 296 sims, avg reward=0.939
   - telecom: 74 tasks, 296 sims, avg reward=0.696
 
+### Run 4: sonnet-4.6, temp=1.0, gpt-4.1 user temp=1.0
+- Agent: `claude-sonnet-4-6`, temp=1.0
+- User: `gpt-4.1`, temp=1.0
+- Split: train, 8 trials per task
+- Files: `distill_sonnet46_t1_gpt41_t1_{airline,retail,telecom}_train.json`
+- Results:
+  - airline: 30 tasks, 240 sims, avg reward=0.671
+  - retail: 74 tasks, 592 sims, avg reward=0.850
+  - telecom: 74 tasks, 592 sims, avg reward=0.620
+
 ## Extracted Training Data
 
 Uploaded to `s3://percepta-research/tau2-trajectories/`.
@@ -42,7 +52,7 @@ Uploaded to `s3://percepta-research/tau2-trajectories/`.
 ### S3 Structure
 ```
 s3://percepta-research/tau2-trajectories/
-├── raw_results/          # Raw simulation JSONs (all 9 files from Runs 1-3)
+├── raw_results/          # Raw simulation JSONs (all 12 files from Runs 1-4)
 └── training_data/
     ├── sonnet46_gpt41/   # Run 1 (1 trial, temp=0) + Run 2 (4 trials, temp=1) = 5 per task
     │   ├── agent.jsonl   # 890 conversations
@@ -50,7 +60,10 @@ s3://percepta-research/tau2-trajectories/
     ├── sonnet46_opus46/  # Run 3 (4 trials, temp=1)
     │   ├── agent.jsonl   # 712 conversations
     │   └── user.jsonl    # 712 conversations
-    └── combined/         # All of the above merged
+    ├── sonnet46_gpt41_t1t1/  # Run 4 (8 trials, agent+user temp=1)
+    │   ├── agent.jsonl
+    │   └── user.jsonl
+    └── combined/         # sonnet46_gpt41 + sonnet46_opus46 (Runs 1-3)
         ├── agent.jsonl   # 1602 conversations
         └── user.jsonl    # 1602 conversations
 ```
