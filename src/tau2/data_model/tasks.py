@@ -362,7 +362,7 @@ class InitialState(BaseModel):
         Optional[list[Message]],
         Field(
             default=None,
-            description="Messages that have already been exchanged between the user, the agent and the environment. This will be used to set the initial state of the environment and of the orchestrator. Last messages must be from the user or the agent.",
+            description="Messages that have already been exchanged between the user, the agent and the environment. This will be used to set the initial state of the environment and of the orchestrator. Replay prefixes may end with a tool response when restoring an env at an agent-turn boundary.",
         ),
     ]
 

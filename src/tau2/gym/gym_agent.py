@@ -1,6 +1,7 @@
 import json
 import threading
 from copy import deepcopy
+from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
 import gymnasium as gym
@@ -23,6 +24,7 @@ from tau2.data_model.message import (
     MultiToolMessage,
     UserMessage,
 )
+from tau2.data_model.tasks import InitialState
 from tau2.data_model.simulation import SimulationRun, Task
 from tau2.environment.environment import Environment
 from tau2.environment.tool import Tool, as_tool
@@ -89,6 +91,17 @@ class GymAgentState(BaseModel):
     messages: list[APICompatibleMessage]
 
 
+@dataclass
+class EnvSnapshot:
+    """Serializable playback snapshot for replay-based branch restores."""
+
+    base_initial_state: Optional[InitialState]
+    message_history: list[Message] = field(default_factory=list)
+    step_count: int = 0
+    num_errors: int = 0
+    simulation_seed: Optional[int] = None
+
+
 def done() -> str:
     """Call this function when you are done with the task."""
     return GymAgent.STOP_TOKEN
@@ -142,6 +155,10 @@ class GymAgent(LocalAgent):
             )
         if self.STOP_FUNCTION_NAME not in tool_names:
             raise ValueError(f"Tool {self.STOP_FUNCTION_NAME} not found in tools.")
+
+    def set_seed(self, seed: int) -> None:
+        """Gym-controlled agents do not sample internally inside tau2."""
+        return None
 
     @property
     def observation(self) -> list[Message]:
@@ -655,13 +672,70 @@ class AgentGymEnv(gym.Env):
             (e.g., due to an error), an empty observation is returned.
         """
         super().reset(seed=seed)
+        return self._reset_with_task(seed=seed)
 
+    def snapshot(self) -> EnvSnapshot:
+        """
+        Capture the current replayable prefix.
+
+        Snapshots are only valid when the env is paused at an agent-turn
+        boundary and waiting for the next action.
+        """
         with self._lock:
-            # Reset state
+            if self._orchestrator is None or self._agent is None:
+                raise RuntimeError("Orchestrator not initialized. Call reset() first.")
+            if not self._agent.is_agent_turn:
+                raise RuntimeError(
+                    "Snapshot can only be taken while waiting for the next agent action."
+                )
+            return EnvSnapshot(
+                base_initial_state=deepcopy(self._get_task().initial_state),
+                message_history=self._orchestrator.get_trajectory(),
+                step_count=self._orchestrator.step_count,
+                num_errors=self._orchestrator.num_errors,
+                simulation_seed=self._orchestrator.seed,
+            )
+
+    def reset_from_snapshot(self, snapshot: EnvSnapshot) -> tuple[str, dict]:
+        """
+        Restore a fresh env from a previously captured playback snapshot.
+        """
+        super().reset(seed=snapshot.simulation_seed)
+        replay_task = self._build_replay_task(snapshot)
+        observation, info = self._reset_with_task(
+            seed=snapshot.simulation_seed,
+            task_override=replay_task,
+        )
+        if self._orchestrator is None:
+            raise RuntimeError("Orchestrator not initialized after snapshot restore.")
+        self._orchestrator.step_count = snapshot.step_count
+        self._orchestrator.num_errors = snapshot.num_errors
+        return observation, info
+
+    def _build_replay_task(self, snapshot: EnvSnapshot) -> Task:
+        """
+        Build a bootstrap-only task that replays the saved prefix.
+        """
+        replay_task = self._get_task().model_copy(deep=True)
+        replay_initial_state = deepcopy(snapshot.base_initial_state)
+        if replay_initial_state is None:
+            replay_initial_state = InitialState()
+        replay_initial_state.message_history = deepcopy(snapshot.message_history)
+        replay_task.initial_state = replay_initial_state
+        return replay_task
+
+    def _reset_with_task(
+        self,
+        seed: Optional[int] = None,
+        task_override: Optional[Task] = None,
+    ) -> tuple[str, dict]:
+        """
+        Start a fresh orchestrator, optionally bootstrapped from a replay task.
+        """
+        with self._lock:
             self._simulation_run = None
             self._simulation_done.clear()
 
-            # Wait for any existing thread to finish
             if self._orchestrator_thread and self._orchestrator_thread.is_alive():
                 self._orchestrator_thread.join(timeout=1.0)
                 if self._orchestrator_thread.is_alive():
@@ -671,32 +745,26 @@ class AgentGymEnv(gym.Env):
                         "WARNING",
                     )
 
-            # Create new orchestrator
-            self._orchestrator = self._get_orchestrator()
+            self._orchestrator = self._get_orchestrator(
+                task=task_override,
+                seed=seed,
+            )
             self._agent = self._orchestrator.agent
             self._user = self._orchestrator.user
 
-            # Start orchestrator in a separate thread
             self._orchestrator_thread = threading.Thread(target=self._run_orchestrator)
             self._orchestrator_thread.daemon = True
             self._orchestrator_thread.start()
 
-            # Wait for orchestrator to send the initial observation
-            # Use a timeout to periodically check if simulation is done
             while not self._simulation_done.is_set() and not self._agent.is_agent_turn:
                 self._simulation_done.wait(timeout=0.01)
 
             if self._simulation_done.is_set():
-                # Simulation ended immediately, return empty observation
                 self._log("Simulation ended immediately", "WARNING")
                 return "", self._get_info()
 
-            # Get the initial observation from the agent
             initial_observation = self._agent.observation.copy()
-
-            # Convert observation to string format
             observation_str = self._format_observation(initial_observation)
-
             return observation_str, self._get_info()
 
     def _get_info(self) -> dict:
@@ -995,7 +1063,7 @@ class AgentGymEnv(gym.Env):
             domain_policy=environment.get_policy(),
         )
 
-    def _get_user(self) -> UserSimulator:
+    def _get_user(self, task: Optional[Task] = None) -> UserSimulator:
         """
         Create and return a UserSimulator instance for the task.
 
@@ -1018,7 +1086,7 @@ class AgentGymEnv(gym.Env):
             ready to participate in the conversation simulation.
         """
         environment = self._get_environment()
-        task = self._get_task()
+        task = task if task is not None else self._get_task()
         try:
             user_tools = environment.get_user_tools()
         except ValueError:
@@ -1030,11 +1098,15 @@ class AgentGymEnv(gym.Env):
                 tools=user_tools,
                 instructions=task.user_scenario,
                 llm=self.user_llm,
-                llm_args=self.user_llm_args,
+                llm_args=deepcopy(self.user_llm_args),
             )
         return user_simulator
 
-    def _get_orchestrator(self) -> Orchestrator:
+    def _get_orchestrator(
+        self,
+        task: Optional[Task] = None,
+        seed: Optional[int] = None,
+    ) -> Orchestrator:
         """
         Create and return an Orchestrator instance for the simulation.
 
@@ -1054,13 +1126,15 @@ class AgentGymEnv(gym.Env):
             The orchestrator is ready to run the complete simulation with
             proper coordination between agent, user, and environment.
         """
+        task = task if task is not None else self._get_task()
         return Orchestrator(
             domain=self.domain,
             agent=self._get_agent(),
-            user=self._get_user(),
+            user=self._get_user(task=task),
             environment=self._get_environment(),
-            task=self._get_task(),
+            task=task,
             max_steps=self.max_steps,
+            seed=seed,
             solo_mode=self.solo_mode,
         )
 
